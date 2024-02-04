@@ -1,0 +1,5 @@
+segment_anything
+cv2import
+matplotlib
+torch
+numpy
