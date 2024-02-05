@@ -1,5 +1,3 @@
 segment_anything
-cv2
-matplotlib
 torch
 numpy

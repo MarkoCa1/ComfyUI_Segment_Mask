@@ -3,10 +3,7 @@ import os
 import numpy as np
 from PIL import Image
 import torch
-import matplotlib.pyplot as plt
-import cv2
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
-import folder_paths
 
 sys.path.append(
     os.path.dirname(os.path.abspath(__file__))
@@ -36,7 +33,44 @@ class AutomaticMask:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "image": ("IMAGE",),
+                "sam_model": ('SAM_MODEL', ),
+                "image": ("IMAGE", ),
+                "points_per_side": ("INT", {
+                    "default": 32,
+                    "min": 0,
+                    "max": 100,
+                    "step": 1
+                }),
+                "pred_iou_thresh": ("FLOAT", {
+                    "default": 0.86,
+                    "min": 0,
+                    "max": 1.0,
+                    "step": 0.01
+                }),
+                "stability_score_thresh": ("FLOAT", {
+                    "default": 0.92,
+                    "min": 0,
+                    "max": 1.0,
+                    "step": 0.01
+                }),
+                "crop_n_layers": ("INT", {
+                    "default": 1,
+                    "min": 0,
+                    "max": 100,
+                    "step": 1
+                }),
+                "crop_n_points_downscale_factor": ("INT", {
+                    "default": 2,
+                    "min": 0,
+                    "max": 100,
+                    "step": 1
+                }),
+                "min_mask_region_area": ("INT", {
+                    "default": 100,
+                    "min": 0,
+                    "max": 100,
+                    "step": 1
+                }),
             },
         }
 
@@ -45,17 +79,16 @@ class AutomaticMask:
     CATEGORY = "segment_anything"
     RETURN_TYPES = ("IMAGE",)
 
-    def main(self, image):
-        sam_checkpoint = folder_paths.get_full_path('sams', 'sam_vit_h_4b8939.pth')
-        model_type = "vit_h"
-
-        device = "cuda"
-
-        sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
-
-        sam.to(device=device)
-
-        mask_generator = SamAutomaticMaskGenerator(sam)
+    def main(self, sam_model, image, points_per_side, pred_iou_thresh, stability_score_thresh, crop_n_layers, crop_n_points_downscale_factor, min_mask_region_area):
+        mask_generator = SamAutomaticMaskGenerator(
+            model=sam_model,
+            points_per_side=points_per_side,
+            pred_iou_thresh=pred_iou_thresh,
+            stability_score_thresh=stability_score_thresh,
+            crop_n_layers=crop_n_layers,
+            crop_n_points_downscale_factor=crop_n_points_downscale_factor,
+            min_mask_region_area=min_mask_region_area,  # Requires open-cv to run post-processing
+        )
 
         image_res = []
         for item in image:
