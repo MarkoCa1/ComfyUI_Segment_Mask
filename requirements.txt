@@ -1,5 +1,5 @@
 segment_anything
-cv2import
+cv2
 matplotlib
 torch
 numpy
