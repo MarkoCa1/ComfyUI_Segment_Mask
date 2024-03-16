@@ -76,7 +76,7 @@ class AutomaticMask:
 
     # RETURN_NAMES = ("IMAGE",)
     FUNCTION = "main"
-    CATEGORY = "segment_anything"
+    CATEGORY = "MK/segment_anything"
     RETURN_TYPES = ("IMAGE",)
 
     def main(self, sam_model, image, points_per_side, pred_iou_thresh, stability_score_thresh, crop_n_layers, crop_n_points_downscale_factor, min_mask_region_area):
