@@ -1,3 +1,4 @@
 segment_anything
 torch
 numpy
+pillow
