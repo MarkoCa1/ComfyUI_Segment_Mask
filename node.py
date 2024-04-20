@@ -3,6 +3,7 @@ import os
 import numpy as np
 from PIL import Image
 import torch
+
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
 
 sys.path.append(
@@ -20,7 +21,6 @@ def show_anns(anns, image_shape):
         m = ann['segmentation']
         color_mask = np.concatenate([np.random.random(3), [0.35]])
         img[m] = color_mask
-    # 将带有标注的numpy图像转化为torch张量
     annotated_img_tensor = torch.from_numpy(img)
 
     return annotated_img_tensor
@@ -35,6 +35,7 @@ class AutomaticMask:
             "required": {
                 "sam_model": ('SAM_MODEL', ),
                 "image": ("IMAGE", ),
+                "mask": ('MASK', ),
                 "points_per_side": ("INT", {
                     "default": 32,
                     "min": 0,
@@ -74,12 +75,12 @@ class AutomaticMask:
             },
         }
 
-    # RETURN_NAMES = ("IMAGE",)
     FUNCTION = "main"
     CATEGORY = "MK/segment_anything"
-    RETURN_TYPES = ("IMAGE",)
+    RETURN_TYPES = ("IMAGE","MASK","IMAGE")
+    RETURN_NAMES = ("Image","Mask","Segment Image")
 
-    def main(self, sam_model, image, points_per_side, pred_iou_thresh, stability_score_thresh, crop_n_layers, crop_n_points_downscale_factor, min_mask_region_area):
+    def main(self, sam_model, image, mask, points_per_side, pred_iou_thresh, stability_score_thresh, crop_n_layers, crop_n_points_downscale_factor, min_mask_region_area):
         mask_generator = SamAutomaticMaskGenerator(
             model=sam_model,
             points_per_side=points_per_side,
@@ -90,20 +91,46 @@ class AutomaticMask:
             min_mask_region_area=min_mask_region_area,  # Requires open-cv to run post-processing
         )
 
-        image_res = []
-        for item in image:
-            image_shape = (item.shape[0], item.shape[1])
-            print(image_shape)
-            item = Image.fromarray(
-                np.clip(255. * item.cpu().numpy(), 0, 255).astype(np.uint8)).convert('RGBA')
-            image_np = np.array(item)
-            image_np_rgb = image_np[..., :3]
+        original_image = image[0].clone()
+        image = image[0]
+        source_mask = mask[0].to(torch.uint8)
 
+        image_shape = (image.shape[0], image.shape[1])
+        image = Image.fromarray(np.clip(255. * image.clone().cpu().numpy(), 0, 255).astype(np.uint8)).convert('RGBA')
+        image_np = np.array(image)
+        image_np_rgb = image_np[..., :3]
 
-            # 生成蒙版
-            masks = mask_generator.generate(image_np_rgb)
-            annotated_image_tensor = show_anns(masks, image_shape)
+        masks = mask_generator.generate(image_np_rgb)
+        source_mask_np_array = np.array(source_mask)
+        for mask_item in masks:
+            segmentation = torch.from_numpy(mask_item["segmentation"])
+            segmentation = segmentation.clone().to(torch.uint8)
+            segmentation_np_array = np.array(segmentation)
 
-            image_res.append(annotated_image_tensor)
+            if source_mask_np_array.shape != segmentation_np_array.shape:
+                print("The size of the mask is different and cannot be compared")
+            else:
+                overlap = np.sum(source_mask_np_array * segmentation_np_array) > 0
+                if overlap :
+                    source_mask = (source_mask | segmentation).type(torch.uint8)
 
-        return (image_res,)
+        annotated_image_tensor = show_anns(masks, image_shape)
+
+        transparent_image_tensor = mask_to_transparent(original_image, source_mask)
+
+        return ([annotated_image_tensor],source_mask, [transparent_image_tensor])
+
+def mask_to_transparent(original_image, source_mask):
+    original_image_np = original_image.numpy()
+    source_mask_np = source_mask.numpy().astype(np.uint8)
+    source_mask_np = source_mask_np * 255
+
+    height, width = original_image_np.shape[0], original_image_np.shape[1]
+    transparent_image = np.zeros((height, width, 4), dtype=np.float64)
+
+    transparent_image[..., :3] = original_image_np
+    transparent_image[..., 3] = source_mask_np
+    transparent_image_tensor = torch.from_numpy(transparent_image)
+
+    return transparent_image_tensor
+
