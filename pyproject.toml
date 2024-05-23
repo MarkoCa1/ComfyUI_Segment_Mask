@@ -1,0 +1,15 @@
+[project]
+name = "comfyui_segment_mask"
+description = "Mask cutout based on Segment Anything."
+version = "1.0.0"
+license = "LICENSE"
+dependencies = ["segment_anything", "torch", "numpy", "pillow"]
+
+[project.urls]
+Repository = "https://github.com/MarkoCa1/ComfyUI_Segment_Mask"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI_Segment_Mask"
+Icon = ""
